@@ -1,0 +1,12 @@
+{
+  "_doc": "Optional. Read by scripts/wake_sync.py. Delete the keys you do not need. {python} = first existing 'python' entry; {data} = output of data_dir_cmd.",
+  "python": ["~/.venvs/NAME/bin/python", "~/.venvs/NAME/Scripts/python.exe"],
+  "data_dir_cmd": ["{python}", "-c", "from mypkg.config import DATA_DIR; print(DATA_DIR)"],
+  "state_file": "{data}/SESSION_STATE.md",
+  "machines_dir": "{data}/.machines",
+  "quiesce": [
+    {"run": ["{python}", "-m", "mypkg", "server", "stop"],
+     "resume": ["{python}", "-m", "mypkg", "server", "start"],
+     "resume_if": "^stopped"}
+  ]
+}

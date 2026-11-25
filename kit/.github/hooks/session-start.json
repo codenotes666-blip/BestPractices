@@ -1,0 +1,12 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "python3 scripts/wake.py --hook",
+        "windows": "python scripts\\wake.py --hook",
+        "timeout": 90
+      }
+    ]
+  }
+}
