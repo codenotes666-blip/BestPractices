@@ -14,6 +14,7 @@ Quick map:
 | "read greg.md" (in a repo) | that repo's `greg.md` (section 3 explains the convention) |
 | "set up / move this machine" | the repo's `greg.md`; if it has none, section 4 then its `greg.md` |
 | "apply best practices to this repo" | section 4 (adopt), then 5 if code sits in a cloud folder |
+| "audit / correct this repo" (or you notice a violation) | section 4a (audit), then whichever section it flags |
 | "refine / improve a practice" | section 9 |
 
 ## 1. Principles
@@ -41,6 +42,13 @@ Quick map:
 | Python env | `~/.venvs/<repo>` - never inside a cloud folder or the repo | rebuilt per machine |
 | Secrets | `.env` in the checkout (git-ignored), from an encrypted vault or copied by hand | per machine |
 | Data backup (optional) | data mirror committed to GitHub by a repo command | when owner asks |
+
+**Exception - small durable data tracked in git.** A compact system of record
+(SQLite well under ~50 MB, curated JSON like cards/templates) MAY live tracked in
+the repo and move with the code; treat it as code for sync purposes (one writer at
+a time still applies). The OneDrive rule is for bulk and live data: big media,
+document collections, caches, anything machines write concurrently. Don't "fix" a
+repo that deliberately tracks its small data (e.g. FlightTrainer's logbook.db).
 
 OneDrive locations: Mac `~/Library/CloudStorage/OneDrive-Personal/`, Windows `%OneDrive%`.
 
@@ -78,6 +86,27 @@ Then the agent's part:
    data folder, shared state file, processes to stop during sync.
 4. `python scripts/wake.py` must run clean. Show Greg the diff; commit on approval.
 
+## 4a. Audit & correct an adopted repo
+
+Run this whenever Greg says "audit / correct this repo", after moving machines, or
+when something feels off. Each check names the section that fixes it:
+
+| Check | Pass looks like | Fix |
+|---|---|---|
+| Checkout location | NOT inside OneDrive/iCloud/Dropbox (wake prints `cloud-synced: no`) | section 5 |
+| venv location | `~/.venvs/<repo>`, not inside the repo or a cloud folder | rebuild per section 2 of the repo's `greg.md` |
+| `.gitattributes` | has `* text=auto eol=lf` | `adopt.py --force`, renormalize per section 4 |
+| Kit scripts | `scripts/wake.py`, `wake_sync.py`, `hibernate.py` present and current | `adopt.py <repo> --force` |
+| `greg.md` | follows the section-3 template (situations 1-5), no stale paths | merge `kit/templates/greg.md` by hand |
+| `requirements.txt` | `pip install -r` works in a FRESH venv (no self-pin, no missing deps that only live in an old venv) | fix the file, verify with a clean venv |
+| `AGENTS.md` size | <= ~3k tokens | re-tier per section 8 |
+| `SESSION_STATE.md` | <= ~80 lines, current | trim/update |
+| **Critical operations** | the repo's deploy/pipeline commands verified read-only (see section 5 step 6a) | before anything else, after any layout change |
+
+Fix what fails, verify (wake clean + the repo's tests + read-only checks of its
+critical operations), show Greg, commit on approval. Never "correct" a deliberate,
+documented exception (e.g. small tracked data, section 2).
+
 ## 5. Move a repo out of a cloud folder (code/data split)
 
 Symptoms that it is needed: hundreds of "modified" files (CRLF), `.git.broken*`
@@ -101,6 +130,14 @@ ahead, "it worked on the other machine".
 5. **Backup (optional).** A command that mirrors the data into the checkout (SQLite
    via the online-backup API) and commits/pushes it on Greg's request.
 6. **Tests** for the data-folder resolution and anything new; run the full suite.
+   Compare failures against the OLD layout before blaming the move: pre-existing
+   failures are not yours to fix mid-migration.
+6a. **Critical operations stay up.** If the repo deploys to live infrastructure
+   (Cloudflare, servers, pipelines), identify those commands FIRST and verify them
+   **read-only** from the new checkout before switching over (e.g. a `status`/drift
+   subcommand that reaches the live targets without changing them). Copy every
+   git-ignored file they need (`.env`, `.dev.vars`, tool auth). No destructive
+   deploy until the read-only check passes from the new location.
 7. **First machine:** clone to local disk, point the venv at it (`pip install -e`),
    copy secrets, restart services, prove the live data is used (e.g. `lsof` shows the
    OneDrive DB), `wake.py` clean. Copy the new `greg.md`/`AGENTS.md` into the data folder.
@@ -159,6 +196,10 @@ Worked example: private repo `codenotes666-blip/amex`, commit `188d4a5`
 
 ## Changelog
 
+- 2026-11-26 - From the FlightTrainer macOS migration: section 4a (audit & correct
+  an adopted repo), section 5 step 6a (verify critical operations read-only before
+  switching), section 2 exception for small durable data tracked in git, and the
+  fresh-venv requirements.txt check (old venvs hide ad-hoc installs).
 - 2026-11-25 - Created from the FlightTrainer bootstrap kit + the amex OneDrive
   migration: greg.md convention, code/data split, OneDrive-safe `wake_sync.py`
   (CRLF noise, stale-file restore, DB superset check, quiesce hooks, shared
